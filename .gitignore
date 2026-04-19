@@ -5,6 +5,12 @@
 .remote_repo/
 node_modules/
 .next/
+*.csv
+!PLD CATEGORY FINAL DATASET.csv
+*.pptx
+*.pdf
+~$*
+New folder/
 dist/
 build/
 __pycache__/
