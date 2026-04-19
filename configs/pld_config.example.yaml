@@ -1,0 +1,41 @@
+chroma:
+  persist_directory: "./chroma_store"
+  collection_name: "pld_corpus"
+
+corpus:
+  csv_paths: []
+  text_column_priority:
+    - "paragraph"
+    - "sentence"
+  metadata_defaults:
+    domain: "materials_science"
+    source_type: "local_csv"
+
+retrieval:
+  enabled: false
+  top_k: 10
+  retry_top_k: 20
+  min_relevance_passes: 3
+
+llm:
+  base_url: "http://localhost:8000/v1"
+  api_key: "local-dev-key"
+  router_model: "grok-router"
+  rewrite_model: "llamat2-rewriter"
+  grader_model: "llamat2-grader"
+  synthesis_model: "llamat2-pi"
+  critic_model: "llamat2-critic"
+  formatter_model: "llamat2-formatter"
+  router_base_url: "https://your-grok-compatible-endpoint/v1"
+  router_api_key: "replace-with-grok-key"
+  temperature: 0.1
+  timeout_seconds: 90
+
+policy:
+  no_web: true
+  max_retry_rounds: 2
+  small_talk_examples:
+    - "hello"
+    - "how are you"
+    - "thanks"
+    - "tell me a joke"
