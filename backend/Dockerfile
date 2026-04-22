@@ -10,8 +10,9 @@ RUN pip install --no-cache-dir -r /app/backend-requirements.txt
 
 COPY pld_copilot /app/pld_copilot
 COPY backend /app/backend
+COPY configs /app/configs
 COPY ["PLD CATEGORY FINAL DATASET.csv", "/app/PLD CATEGORY FINAL DATASET.csv"]
 
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

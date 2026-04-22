@@ -5,10 +5,10 @@ from typing import Any
 
 
 @dataclass
-class RouteDecision:
-    route: str
-    reason: str
-    metadata_filters: dict[str, Any] = field(default_factory=dict)
+class DirectorDecision:
+    decision: str
+    reasoning: str
+    target_tags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -17,20 +17,15 @@ class RetrievedChunk:
     text: str
     doi: str
     title: str
-    metadata: dict[str, Any]
+    chunk_idx: int
+    metadata: dict[str, Any] = field(default_factory=dict)
     score: float | None = None
-
-
-@dataclass
-class GradedChunk:
-    chunk: RetrievedChunk
-    relevant: bool
-    rationale: str
+    origin: str = ""
 
 
 @dataclass
 class PipelineResult:
     route: str
     answer_markdown: str
-    citations: list[str]
+    sources: list[RetrievedChunk] = field(default_factory=list)
     debug: dict[str, Any] = field(default_factory=dict)

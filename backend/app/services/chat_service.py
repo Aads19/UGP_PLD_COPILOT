@@ -7,11 +7,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from backend.app.db.models import Conversation, Message
 from backend.app.schemas.chat import (
-    AssistantMessageResponse,
     ChatRequest,
     ChatResponse,
-    ConversationDetail,
     ConversationSummary,
+    DeleteConversationResponse,
+    SourceResponse,
     StoredMessage,
 )
 from backend.app.services.pipeline_service import PipelineService
@@ -29,29 +29,21 @@ class ChatService:
         assistant = self.pipeline.run(payload.message)
         assistant_record = Message(
             conversation_id=conversation.id,
-            role=assistant.role,
-            content_markdown=assistant.content_markdown,
+            role="assistant",
+            content_markdown=assistant.answer,
             route=assistant.route,
-            citations_json=[item.model_dump() for item in assistant.citations],
+            citations_json=[],
             sources_json=[item.model_dump() for item in assistant.sources],
         )
         self.db.add(assistant_record)
         conversation.updated_at = datetime.now(timezone.utc)
         self.db.flush()
-        self.db.refresh(assistant_record)
         self.db.commit()
 
         return ChatResponse(
+            answer=assistant.answer,
+            sources=assistant.sources,
             conversation_id=conversation.id,
-            message=AssistantMessageResponse(
-                id=assistant_record.id,
-                role=assistant_record.role,
-                content_markdown=assistant_record.content_markdown,
-                route=assistant_record.route or "database",
-                citations=assistant.citations,
-                sources=assistant.sources,
-                created_at=assistant_record.created_at,
-            ),
         )
 
     def list_conversations(self) -> list[ConversationSummary]:
@@ -63,21 +55,23 @@ class ChatService:
         conversations = self.db.scalars(query).all()
         items: list[ConversationSummary] = []
         for conversation in conversations:
-            preview = ""
-            if conversation.messages:
-                preview = conversation.messages[-1].content_markdown[:140]
+            first_user_message = next(
+                (message.content_markdown for message in conversation.messages if message.role == "user"),
+                "",
+            )
+            preview = " ".join(first_user_message.split()).strip()
+            if len(preview) > 80:
+                preview = preview[:77].rstrip() + "..."
             items.append(
                 ConversationSummary(
-                    id=conversation.id,
-                    title=conversation.title,
-                    preview=preview,
-                    updated_at=conversation.updated_at,
+                    conversation_id=conversation.id,
+                    first_message=preview or conversation.title,
                     created_at=conversation.created_at,
                 )
             )
         return items
 
-    def get_conversation(self, conversation_id: str) -> ConversationDetail | None:
+    def get_conversation(self, conversation_id: str) -> list[StoredMessage] | None:
         query = (
             select(Conversation)
             .options(selectinload(Conversation.messages))
@@ -87,24 +81,24 @@ class ChatService:
         if conversation is None:
             return None
 
-        return ConversationDetail(
-            id=conversation.id,
-            title=conversation.title,
-            created_at=conversation.created_at,
-            updated_at=conversation.updated_at,
-            messages=[
-                StoredMessage(
-                    id=message.id,
-                    role=message.role,
-                    content_markdown=message.content_markdown,
-                    route=message.route,
-                    citations=message.citations_json or [],
-                    sources=message.sources_json or [],
-                    created_at=message.created_at,
-                )
-                for message in conversation.messages
-            ],
-        )
+        return [
+            StoredMessage(
+                role=message.role,
+                content=message.content_markdown,
+                sources=[SourceResponse(**item) for item in (message.sources_json or [])],
+                created_at=message.created_at,
+            )
+            for message in conversation.messages
+        ]
+
+    def delete_conversation(self, conversation_id: str) -> DeleteConversationResponse | None:
+        conversation = self.db.get(Conversation, conversation_id)
+        if conversation is None:
+            return None
+
+        self.db.delete(conversation)
+        self.db.commit()
+        return DeleteConversationResponse(deleted=True, conversation_id=conversation_id)
 
     def _get_or_create_conversation(self, payload: ChatRequest) -> Conversation:
         if payload.conversation_id:
@@ -112,7 +106,13 @@ class ChatService:
             if conversation is not None:
                 return conversation
 
-        conversation = Conversation(title=self._title_from_message(payload.message))
+        if payload.conversation_id:
+            conversation = Conversation(
+                id=payload.conversation_id,
+                title=self._title_from_message(payload.message),
+            )
+        else:
+            conversation = Conversation(title=self._title_from_message(payload.message))
         self.db.add(conversation)
         self.db.flush()
         self.db.refresh(conversation)

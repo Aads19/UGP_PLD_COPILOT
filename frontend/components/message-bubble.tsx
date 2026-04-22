@@ -1,9 +1,10 @@
 import ReactMarkdown from "react-markdown";
 
-import { ChatMessage } from "../lib/types";
+import { UiMessage } from "../lib/types";
+import { SourcesCard } from "./sources-card";
 
 type MessageBubbleProps = {
-  message: ChatMessage;
+  message: UiMessage;
 };
 
 export function MessageBubble({ message }: MessageBubbleProps) {
@@ -17,40 +18,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
 
       <div className="bubble-body">
-        <ReactMarkdown>{message.content_markdown}</ReactMarkdown>
+        <ReactMarkdown>{message.content}</ReactMarkdown>
       </div>
 
-      {isAssistant && message.citations.length > 0 ? (
-        <div className="citations">
-          {message.citations.map((citation) => (
-            <a
-              className="citation-link"
-              href={citation.url ?? "#"}
-              key={`${message.id}-${citation.doi}`}
-              rel="noreferrer"
-              target="_blank"
-            >
-              <strong>{citation.title || citation.doi}</strong>
-              <span className="muted">{citation.doi}</span>
-            </a>
-          ))}
-        </div>
-      ) : null}
-
-      {isAssistant && message.sources.length > 0 ? (
-        <details className="details">
-          <summary>View retrieved evidence</summary>
-          <div className="source-list">
-            {message.sources.map((source) => (
-              <div className="source-card" key={`${message.id}-${source.chunk_id}`}>
-                <strong>{source.title || "Untitled source"}</strong>
-                <div className="muted">{source.doi}</div>
-                <p>{source.snippet}</p>
-              </div>
-            ))}
-          </div>
-        </details>
-      ) : null}
+      {isAssistant ? <SourcesCard sources={message.sources} /> : null}
     </article>
   );
 }

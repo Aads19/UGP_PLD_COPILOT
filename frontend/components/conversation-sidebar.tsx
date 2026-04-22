@@ -23,15 +23,26 @@ export function ConversationSidebar({ conversations, onSelect }: ConversationSid
           conversations.map((conversation) => (
             <button
               className="conversation-item"
-              key={conversation.id}
-              onClick={() => void onSelect(conversation.id)}
+              key={conversation.conversation_id}
+              onClick={() => void onSelect(conversation.conversation_id)}
             >
-              <strong>{conversation.title}</strong>
-              <span className="muted">{conversation.preview || "Open this thread"}</span>
+              <strong>{conversation.first_message || "Untitled conversation"}</strong>
+              <span className="muted">{formatDate(conversation.created_at)}</span>
             </button>
           ))
         )}
       </div>
     </aside>
   );
+}
+
+function formatDate(value?: string) {
+  if (!value) {
+    return "Open this thread";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Open this thread";
+  }
+  return date.toLocaleDateString();
 }

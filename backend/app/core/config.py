@@ -7,51 +7,48 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from pld_copilot.config import (
-    AppConfig,
-    ChromaConfig,
-    CorpusConfig,
-    LLMConfig,
-    PolicyConfig,
-    RetrievalConfig,
-)
+from pld_copilot.config import AppConfig, ChromaConfig, CorpusConfig, LLMConfig, PolicyConfig, RetrievalConfig
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
-def _bool_from_env(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
+def _default_corpus_paths() -> list[str]:
+    explicit = os.getenv("CSV_PATH")
+    if explicit:
+        return [explicit]
+
+    repo_root = Path(__file__).resolve().parents[3]
+    bundled_dataset = repo_root / "PLD CATEGORY FINAL DATASET.csv"
+    if bundled_dataset.exists():
+        return [str(bundled_dataset)]
+    return []
 
 
-def _int_from_env(name: str, default: int) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return int(raw)
+def _database_url_from_env() -> str:
+    explicit_url = os.getenv("DATABASE_URL")
+    if explicit_url:
+        return explicit_url
+
+    raw_path = os.getenv("DATABASE_PATH", "./conversations.db")
+    db_path = Path(raw_path)
+    if db_path.is_absolute():
+        return f"sqlite:///{db_path.as_posix()}"
+    normalized = db_path.as_posix()
+    if normalized.startswith("./"):
+        return f"sqlite:///{normalized}"
+    return f"sqlite:///./{normalized}"
 
 
-def _float_from_env(name: str, default: float) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return float(raw)
+def _allowed_origins_from_env() -> list[str]:
+    explicit = os.getenv("ALLOWED_ORIGINS")
+    if explicit:
+        return [item.strip() for item in explicit.split(",") if item.strip()]
 
-
-def _list_from_env(name: str, default: list[str]) -> list[str]:
-    raw = os.getenv(name)
-    if raw is None or not raw.strip():
-        return default
-    return [item.strip() for item in raw.split(",") if item.strip()]
-
-
-def _examples_from_env(name: str, default: list[str]) -> list[str]:
-    raw = os.getenv(name)
-    if raw is None or not raw.strip():
-        return default
-    return [item.strip() for item in raw.split("|") if item.strip()]
+    origins = ["http://localhost:3000"]
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url:
+        origins.insert(0, frontend_url.strip())
+    return origins
 
 
 @dataclass
@@ -64,23 +61,11 @@ class Settings:
     pipeline_config: AppConfig
 
 
-def _default_corpus_paths() -> list[str]:
-    explicit = os.getenv("CHROMA_BOOTSTRAP_CSV_PATH")
-    if explicit:
-        return [explicit]
-
-    repo_root = Path(__file__).resolve().parents[3]
-    bundled_dataset = repo_root / "PLD CATEGORY FINAL DATASET.csv"
-    if bundled_dataset.exists():
-        return [str(bundled_dataset)]
-
-    return []
-
-
 def _build_pipeline_config() -> AppConfig:
+    chroma_path = os.getenv("CHROMA_PATH") or os.getenv("CHROMA_PERSIST_DIRECTORY") or "./chroma_db"
     return AppConfig(
         chroma=ChromaConfig(
-            persist_directory=os.getenv("CHROMA_PERSIST_DIRECTORY", "./chroma_store"),
+            persist_directory=chroma_path,
             collection_name=os.getenv("CHROMA_COLLECTION_NAME", "pvd_docs"),
         ),
         corpus=CorpusConfig(
@@ -92,10 +77,9 @@ def _build_pipeline_config() -> AppConfig:
             },
         ),
         retrieval=RetrievalConfig(
-            enabled=_bool_from_env("RETRIEVAL_ENABLED", True),
-            top_k=_int_from_env("RETRIEVAL_TOP_K", 10),
-            retry_top_k=_int_from_env("RETRIEVAL_RETRY_TOP_K", 20),
-            min_relevance_passes=_int_from_env("RETRIEVAL_MIN_RELEVANCE_PASSES", 3),
+            enabled=(os.getenv("RETRIEVAL_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}),
+            top_k=int(os.getenv("RETRIEVAL_TOP_K", "3")),
+            candidate_count=int(os.getenv("RETRIEVAL_CANDIDATE_COUNT", "9")),
         ),
         llm=LLMConfig(
             base_url=os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1"),
@@ -103,21 +87,25 @@ def _build_pipeline_config() -> AppConfig:
             router_model=os.getenv("LLM_ROUTER_MODEL", "llama-3.1-8b-instant"),
             rewrite_model=os.getenv("LLM_REWRITE_MODEL", "llama-3.1-8b-instant"),
             grader_model=os.getenv("LLM_GRADER_MODEL", "llama-3.1-8b-instant"),
-            synthesis_model=os.getenv("LLM_SYNTHESIS_MODEL", "llama-3.1-70b-versatile"),
+            synthesis_model=os.getenv("LLM_SYNTHESIS_MODEL", "llama-3.1-8b-instant"),
             critic_model=os.getenv("LLM_CRITIC_MODEL", "llama-3.1-8b-instant"),
             formatter_model=os.getenv("LLM_FORMATTER_MODEL", "llama-3.1-8b-instant"),
             router_base_url=os.getenv("LLM_ROUTER_BASE_URL") or None,
             router_api_key=os.getenv("LLM_ROUTER_API_KEY") or None,
-            temperature=_float_from_env("LLM_TEMPERATURE", 0.1),
-            timeout_seconds=_int_from_env("LLM_TIMEOUT_SECONDS", 90),
+            temperature=float(os.getenv("LLM_TEMPERATURE", "0.1")),
+            timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "90")),
+            gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+            gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            embedding_model_name=os.getenv("EMBEDDING_MODEL_NAME", "BAAI/bge-small-en-v1.5"),
+            reranker_model_name=os.getenv("RERANKER_MODEL_NAME", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+            hyde_model=os.getenv("LLM_HYDE_MODEL") or os.getenv("LLM_REWRITE_MODEL", "llama-3.1-8b-instant"),
+            chat_model=os.getenv("LLM_CHAT_MODEL") or os.getenv("LLM_ROUTER_MODEL", "llama-3.1-8b-instant"),
+            paraphrase_model=os.getenv("LLM_PARAPHRASE_MODEL") or os.getenv("LLM_FORMATTER_MODEL", "llama-3.1-8b-instant"),
         ),
         policy=PolicyConfig(
             no_web=True,
-            max_retry_rounds=_int_from_env("POLICY_MAX_RETRY_ROUNDS", 2),
-            small_talk_examples=_examples_from_env(
-                "POLICY_SMALL_TALK_EXAMPLES",
-                ["hello", "how are you", "thanks", "tell me a joke"],
-            ),
+            max_retry_rounds=0,
+            small_talk_examples=["hello", "hi", "hey", "thanks", "thank you"],
         ),
     )
 
@@ -127,8 +115,8 @@ def get_settings() -> Settings:
     return Settings(
         app_name=os.getenv("APP_NAME", "UGP PLD Copilot API"),
         app_env=os.getenv("APP_ENV", "development"),
-        allowed_origins=_list_from_env("ALLOWED_ORIGINS", ["http://localhost:3000"]),
-        api_rate_limit=_int_from_env("API_RATE_LIMIT", 20),
-        database_url=os.getenv("DATABASE_URL", "sqlite:///./pld_copilot.db"),
+        allowed_origins=_allowed_origins_from_env(),
+        api_rate_limit=int(os.getenv("API_RATE_LIMIT", "20")),
+        database_url=_database_url_from_env(),
         pipeline_config=_build_pipeline_config(),
     )

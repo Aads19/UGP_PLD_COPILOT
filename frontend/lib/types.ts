@@ -1,25 +1,18 @@
-export type Citation = {
-  doi: string;
-  title: string;
-  url?: string | null;
-};
-
 export type Source = {
-  chunk_id: string;
-  title: string;
   doi: string;
-  snippet: string;
-  score?: number | null;
+  title: string;
+  chunk_idx: number;
 };
 
-export type ChatMessage = {
-  id: string;
-  role: string;
-  content_markdown: string;
-  route: string;
-  citations: Citation[];
+export type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
   sources: Source[];
   created_at: string;
+};
+
+export type UiMessage = ConversationMessage & {
+  id: string;
 };
 
 export type ChatRequest = {
@@ -28,22 +21,13 @@ export type ChatRequest = {
 };
 
 export type ChatResponse = {
+  answer: string;
+  sources: Source[];
   conversation_id: string;
-  message: ChatMessage;
 };
 
 export type ConversationSummary = {
-  id: string;
-  title: string;
-  preview: string;
+  conversation_id: string;
+  first_message: string;
   created_at?: string;
-  updated_at?: string;
-};
-
-export type ConversationDetail = {
-  id: string;
-  title: string;
-  created_at?: string;
-  updated_at?: string;
-  messages: ChatMessage[];
 };

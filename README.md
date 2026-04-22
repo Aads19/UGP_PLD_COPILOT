@@ -1,207 +1,161 @@
 # UGP PLD Copilot
 
-UGP PLD Copilot is now structured as a deployable research chatbot for pulsed laser deposition literature workflows. The repository keeps the existing `pld_copilot` agentic RAG package, adds a `FastAPI` backend for chat and conversation APIs, and includes a `Next.js` frontend for a public chatbot-style interface.
+## Project Overview
+UGP PLD Copilot is an undergraduate research project that turns a categorized corpus of Physical Vapor Deposition (PVD) and Pulsed Laser Deposition (PLD) literature into a domain-specific AI assistant. The system uses a multi-agent Retrieval-Augmented Generation pipeline to route questions, expand and enrich scientific queries, retrieve evidence from a ChromaDB vector store, rerank candidate chunks with a cross-encoder, generate a grounded draft answer with Gemini, and produce a clean final response with Groq-powered paraphrasing. The result is a chatbot that is optimized for evidence-backed answers with explicit source visibility rather than generic conversational summaries.
 
-The project now supports two deployment modes:
+## System Architecture
+The production pipeline follows seven stages:
 
-- `frontend/` can run as a self-contained Vercel deployment with integrated `/api/chat` and `/api/health` routes backed by Groq plus the bundled CSV corpus.
-- `backend/` can still run as the full FastAPI service when you want the original Python pipeline, Chroma persistence, and Postgres-backed conversation storage.
+1. **Chief Director Agent** decides whether a user message is simple conversation (`chat`) or a technical literature query (`database`). For scientific questions it also assigns one or more tags from `Background`, `Synthesis`, `Characterization`, and `Analysis`.
+2. **Query Expander Agent** rewrites the original question into a dense academic retrieval query using PLD/PVD terminology and tag-aware keywords.
+3. **HyDE Generator** creates a hypothetical paper-style paragraph so the retrieval query embeds closer to real scientific text chunks.
+4. **Dual Retrieval** runs two ChromaDB searches against the `pvd_docs` collection: one using the expanded query embedding and one using the HyDE paragraph embedding. Both paths apply tag-based metadata filters and retrieve candidate chunks.
+5. **Hybrid Reranker** merges both retrieval pools, removes duplicates, and reranks the merged set with `cross-encoder/ms-marco-MiniLM-L-6-v2` using the user’s original query as the final relevance signal.
+6. **Final Answer Generator** sends the top evidence chunks to Gemini and requests a grounded answer that cites chunk-level support with `[Chunk 1]`, `[Chunk 2]`, and `[Chunk 3]`.
+7. **Paraphrase and Citation Restructuring** uses Groq `llama-3.1-8b-instant` to rewrite the answer in cleaner academic language, remove inline chunk markers from the answer body, and append a final citations section derived from the retrieved sources.
 
-## Architecture
+## Technology Stack
+- Python 3.10+
+- FastAPI
+- ChromaDB 0.5.5
+- `BAAI/bge-small-en-v1.5` for embeddings
+- `cross-encoder/ms-marco-MiniLM-L-6-v2` for reranking
+- Groq API with `llama-3.1-8b-instant`
+- Google Gemini 2.0 Flash with `gemini-flash-latest` fallback
+- Next.js
+- React
+- Vercel for frontend hosting
+- Railway or Render for backend hosting
+- SQLite for anonymous conversation persistence
 
-- `pld_copilot/`: existing PLD agent pipeline, retrieval, grading, synthesis, critique, and formatting logic
-- `backend/`: FastAPI service, database persistence, API routes, and Docker deployment setup
-- `frontend/`: Next.js chatbot UI for public/demo access
-- `render.yaml`: starter Render deployment manifest for the backend
+## Local Setup — Backend
+1. Clone the repository and enter the backend workspace:
 
-The backend wraps the current pipeline instead of replacing it. The frontend renders answer markdown, DOI-linked citations, and expandable source evidence. In the Vercel-integrated mode, the same UI talks to colocated Next.js API routes instead of an external backend service.
+   ```bash
+   git clone https://github.com/Aads19/UGP_PLD_COPILOT.git
+   cd UGP_PLD_COPILOT
+   cd backend
+   ```
 
-## Features
+2. Create and activate a virtual environment:
 
-- Public chatbot UI focused on PLD and thin-film literature questions
-- Source-grounded answers with DOI links
-- Expandable retrieved evidence snippets beneath answers
-- Anonymous saved conversations
-- Health endpoint for deployment checks
-- Docker-ready backend deployment for Render or Railway
-- Self-contained Vercel deployment path for a live demo without separate backend hosting
+   ```bash
+   python -m venv .venv
+   ```
 
-## Local Development
+   On Windows PowerShell:
 
-### 1. Backend
+   ```powershell
+   .\.venv\Scripts\Activate.ps1
+   ```
 
-Create a Python environment and install dependencies:
+3. Install the pinned backend dependencies:
 
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r backend\requirements.txt
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Copy the environment template and fill in the required values:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   On Windows PowerShell:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+5. Make sure `CHROMA_PATH` points to a valid persisted ChromaDB directory that already contains the `pvd_docs` collection, or rebuild it using the ingestion step below.
+
+6. Start the backend server:
+
+   ```bash
+   uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+   ```
+
+## Local Setup — Frontend
+1. Open a new terminal and enter the frontend workspace:
+
+   ```bash
+   cd UGP_PLD_COPILOT/frontend
+   ```
+
+2. Install Node.js dependencies:
+
+   ```bash
+   npm install
+   ```
+
+3. Copy the frontend environment template:
+
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+   On Windows PowerShell:
+
+   ```powershell
+   Copy-Item .env.local.example .env.local
+   ```
+
+4. Set `NEXT_PUBLIC_API_URL=http://localhost:8000` in `frontend/.env.local`.
+
+5. Start the frontend:
+
+   ```bash
+   npm run dev
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000).
+
+## Building the ChromaDB Database
+The vector database only needs to be built once per dataset version. The ingestion pipeline reads `PLD CATEGORY FINAL DATASET.csv`, parses the category tags into boolean metadata fields (`is_Background`, `is_Synthesis`, `is_Characterization`, `is_Analysis`), generates embeddings with `BAAI/bge-small-en-v1.5`, and stores the chunks in a persisted ChromaDB directory.
+
+Use the provided CLI entry point:
+
+```bash
+python main.py ingest --config configs/pld_config.example.yaml --reset
 ```
 
-Copy the backend environment template:
+Before running ingestion:
+- Update `configs/pld_config.example.yaml` or provide your own config file.
+- Point `chroma.persist_directory` to the directory where the rebuilt ChromaDB should be stored.
+- Make sure the CSV path in the config points to the categorized dataset.
 
-```powershell
-Copy-Item .\backend\.env.example .\backend\.env
-```
-
-Set the required values in `backend/.env`:
-
-- `GROQ_API_KEY`
-- `DATABASE_URL`
-- `CHROMA_PERSIST_DIRECTORY`
-- `CHROMA_COLLECTION_NAME`
-- model names and optional router overrides
-
-Run the backend:
-
-```powershell
-uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 2. Frontend
-
-Install dependencies:
-
-```powershell
-cd frontend
-npm install
-```
-
-Copy the frontend environment template:
-
-```powershell
-Copy-Item .\.env.example .\.env.local
-```
-
-Set:
-
-- `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api` for split frontend/backend development
-- or leave it unset to use the colocated `/api` routes in the Vercel-integrated mode
-- `GROQ_API_KEY` if you want the integrated frontend API routes to generate live answers locally
-
-Run the frontend:
-
-```powershell
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-## API Overview
-
-### `POST /api/chat`
-
-Request:
-
-```json
-{
-  "conversation_id": null,
-  "message": "What PLD growth parameters influence crystallinity?"
-}
-```
-
-Response includes:
-
-- `conversation_id`
-- assistant `message`
-- `citations`
-- `sources`
-- route label
-
-### `GET /api/conversations`
-
-Returns saved anonymous conversation summaries.
-
-### `GET /api/conversations/{id}`
-
-Returns the full conversation history for one thread.
-
-### `GET /api/health`
-
-Reports API readiness, DB connectivity, Groq config presence, and Chroma retriever status.
-
-## Chroma Setup
-
-For the full Python backend, use your current Chroma artifacts as the source of truth instead of rebuilding embeddings during deploy.
-
-Recommended layout:
-
-- place the Chroma persistence bundle in a folder mounted or copied to the backend runtime
-- set `CHROMA_PERSIST_DIRECTORY` to that folder
-- set `CHROMA_COLLECTION_NAME` to the existing collection name in your Chroma database
-
-The repository intentionally does not commit the Chroma binary store because the SQLite bundle exceeds normal GitHub file-size limits. Mount it on the deployment host and point `CHROMA_PERSIST_DIRECTORY` at that mounted folder.
-
-If you deploy only the Vercel-integrated frontend, the app uses the bundled CSV corpus for lightweight retrieval and does not require Chroma to be mounted.
+After the build completes, set `CHROMA_PATH` in the backend environment to the persisted directory that contains the `pvd_docs` collection.
 
 ## Deployment
+The recommended deployment split is:
 
-### Frontend on Vercel
+- **Backend** on Railway or Render using the Dockerfile in `backend/`
+- **Frontend** on Vercel using the Next.js app in `frontend/`
 
-Deploy the `frontend/` app from GitHub or with the Vercel CLI. The frontend can run online by itself without the FastAPI backend.
+For backend deployment:
+- Set `GROQ_API_KEY`, `GEMINI_API_KEY`, `CHROMA_PATH`, `DATABASE_PATH`, and `FRONTEND_URL`.
+- Mount a persistent volume that contains the prebuilt ChromaDB directory.
+- Point `CHROMA_PATH` to that mounted directory.
+- Expose `/api/health` as the platform health check.
 
-Environment variable:
+For frontend deployment:
+- Set `NEXT_PUBLIC_API_URL` to the full backend base URL, for example `https://your-backend.railway.app`.
+- Deploy the `frontend/` folder to Vercel.
 
-- `GROQ_API_KEY`
-- optionally `GROQ_MODEL`
-- optionally `NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain/api` if you want the deployed UI to talk to the separate FastAPI backend instead of the built-in `/api` routes
-
-### Backend on Render or Railway
-
-Deploy using `backend/Dockerfile`.
-
-Required environment variables:
-
-- `GROQ_API_KEY`
-- `LLM_BASE_URL`
-- `LLM_ROUTER_MODEL`
-- `LLM_REWRITE_MODEL`
-- `LLM_GRADER_MODEL`
-- `LLM_SYNTHESIS_MODEL`
-- `LLM_CRITIC_MODEL`
-- `LLM_FORMATTER_MODEL`
-- `CHROMA_PERSIST_DIRECTORY`
-- `CHROMA_COLLECTION_NAME`
-- `DATABASE_URL`
-- `API_RATE_LIMIT`
-- `ALLOWED_ORIGINS`
-
-For Render, `render.yaml` provides a starting point. Update the frontend domain and storage path before using it.
-
-## Security Notes
-
-- Rotate any personal access token or Hugging Face token that has ever been pasted into notebooks, chat, or committed files.
-- Keep all secrets in environment variables only.
-- Do not commit `.env` files.
-
-## Troubleshooting
-
-### Backend returns 503
-
-Check:
-
-- `GROQ_API_KEY`
-- model names
-- outbound network access from your host
-- `CHROMA_PERSIST_DIRECTORY`
-
-### Health endpoint says Chroma is unavailable
-
-Check:
-
-- `RETRIEVAL_ENABLED=true`
-- correct Chroma path
-- correct collection name
-- `chromadb` installed in the backend environment
-
-### No saved conversations appear
-
-Check:
-
-- `DATABASE_URL`
-- database permissions
-- backend startup logs for table creation issues
-
-## Legacy CLI
-
-The original CLI entrypoint still exists in [main.py](/C:/UGP%20-%20SHIKHA%20MISRA/main.py) for ingestion and command-line experiments with the underlying pipeline.
+## Environment Variables
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `GROQ_API_KEY` | Yes | None | Groq key used by the Director, Query Expander, HyDE, chat reply, and paraphrase stages. |
+| `GEMINI_API_KEY` | Yes | None | Gemini key used by the grounded answer generation stage. |
+| `CHROMA_PATH` | Yes | `./chroma_db` | Filesystem path to the persisted ChromaDB directory. |
+| `DATABASE_PATH` | No | `./conversations.db` | SQLite database file used for anonymous conversation history. |
+| `FRONTEND_URL` | Yes for production | None | Frontend origin used in backend CORS configuration. |
+| `PORT` | No | `8000` | FastAPI server port in local or hosted environments. |
+| `NEXT_PUBLIC_API_URL` | Yes for frontend | None | Base URL of the deployed backend API used by the Next.js frontend. |
+| `GEMINI_MODEL` | No | `gemini-2.0-flash` | Gemini model name for the final answer generator. |
+| `LLM_ROUTER_MODEL` | No | `llama-3.1-8b-instant` | Groq model used by the Director. |
+| `LLM_REWRITE_MODEL` | No | `llama-3.1-8b-instant` | Groq model used by the Query Expander. |
+| `LLM_HYDE_MODEL` | No | `llama-3.1-8b-instant` | Groq model used by the HyDE generator. |
+| `LLM_PARAPHRASE_MODEL` | No | `llama-3.1-8b-instant` | Groq model used for final paraphrasing. |
+| `EMBEDDING_MODEL_NAME` | No | `BAAI/bge-small-en-v1.5` | SentenceTransformer model used for manual query embeddings and ingestion. |
+| `RERANKER_MODEL_NAME` | No | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Cross-encoder model used for reranking retrieval candidates. |

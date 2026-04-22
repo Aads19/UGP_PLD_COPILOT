@@ -1,41 +1,51 @@
 chroma:
   persist_directory: "./chroma_store"
-  collection_name: "pld_corpus"
+  collection_name: "pvd_docs"
 
 corpus:
-  csv_paths: []
+  csv_paths:
+    - "../PLD CATEGORY FINAL DATASET.csv"
   text_column_priority:
+    - "text_chunk"
     - "paragraph"
     - "sentence"
+    - "text"
   metadata_defaults:
     domain: "materials_science"
     source_type: "local_csv"
 
 retrieval:
-  enabled: false
-  top_k: 10
-  retry_top_k: 20
-  min_relevance_passes: 3
+  enabled: true
+  top_k: 3
+  candidate_count: 9
 
 llm:
-  base_url: "http://localhost:8000/v1"
-  api_key: "local-dev-key"
-  router_model: "grok-router"
-  rewrite_model: "llamat2-rewriter"
-  grader_model: "llamat2-grader"
-  synthesis_model: "llamat2-pi"
-  critic_model: "llamat2-critic"
-  formatter_model: "llamat2-formatter"
-  router_base_url: "https://your-grok-compatible-endpoint/v1"
-  router_api_key: "replace-with-grok-key"
+  base_url: "https://api.groq.com/openai/v1"
+  api_key: "replace-with-groq-api-key"
+  router_model: "llama-3.1-8b-instant"
+  rewrite_model: "llama-3.1-8b-instant"
+  grader_model: "llama-3.1-8b-instant"
+  synthesis_model: "llama-3.1-8b-instant"
+  critic_model: "llama-3.1-8b-instant"
+  formatter_model: "llama-3.1-8b-instant"
+  router_base_url:
+  router_api_key:
   temperature: 0.1
   timeout_seconds: 90
+  gemini_api_key: "replace-with-gemini-api-key"
+  gemini_model: "gemini-2.0-flash"
+  embedding_model_name: "BAAI/bge-small-en-v1.5"
+  reranker_model_name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  hyde_model: "llama-3.1-8b-instant"
+  chat_model: "llama-3.1-8b-instant"
+  paraphrase_model: "llama-3.1-8b-instant"
 
 policy:
   no_web: true
-  max_retry_rounds: 2
+  max_retry_rounds: 0
   small_talk_examples:
     - "hello"
-    - "how are you"
+    - "hi"
+    - "hey"
     - "thanks"
-    - "tell me a joke"
+    - "thank you"

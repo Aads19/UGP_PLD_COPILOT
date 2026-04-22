@@ -5,28 +5,10 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
-class CitationResponse(BaseModel):
-    doi: str = ""
-    title: str = ""
-    url: str | None = None
-
-
 class SourceResponse(BaseModel):
-    chunk_id: str
-    title: str = ""
     doi: str = ""
-    snippet: str
-    score: float | None = None
-
-
-class AssistantMessageResponse(BaseModel):
-    id: str
-    role: str
-    content_markdown: str
-    route: str
-    citations: list[CitationResponse] = Field(default_factory=list)
-    sources: list[SourceResponse] = Field(default_factory=list)
-    created_at: datetime
+    title: str = ""
+    chunk_idx: int = 0
 
 
 class ChatRequest(BaseModel):
@@ -35,39 +17,28 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    answer: str
+    sources: list[SourceResponse] = Field(default_factory=list)
     conversation_id: str
-    message: AssistantMessageResponse
 
 
 class ConversationSummary(BaseModel):
-    id: str
-    title: str
-    preview: str
-    updated_at: datetime | None = None
+    conversation_id: str
+    first_message: str
     created_at: datetime | None = None
 
 
 class StoredMessage(BaseModel):
-    id: str
     role: str
-    content_markdown: str
-    route: str | None = None
-    citations: list[CitationResponse] = Field(default_factory=list)
+    content: str
     sources: list[SourceResponse] = Field(default_factory=list)
     created_at: datetime
 
 
-class ConversationDetail(BaseModel):
-    id: str
-    title: str
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-    messages: list[StoredMessage] = Field(default_factory=list)
-
-
 class HealthResponse(BaseModel):
-    ok: bool
-    app_env: str
-    database_connected: bool
-    chroma: dict
-    groq_configured: bool
+    status: str = "ok"
+
+
+class DeleteConversationResponse(BaseModel):
+    deleted: bool
+    conversation_id: str

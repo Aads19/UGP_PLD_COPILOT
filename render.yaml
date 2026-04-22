@@ -7,19 +7,13 @@ services:
     plan: starter
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ugp-pld-copilot-db
-          property: connectionString
       - key: API_RATE_LIMIT
         value: "20"
-      - key: ALLOWED_ORIGINS
-        value: https://your-vercel-domain.vercel.app,http://localhost:3000
+      - key: FRONTEND_URL
+        value: https://frontend-aads19s-projects.vercel.app
       - key: CHROMA_COLLECTION_NAME
         value: pvd_docs
-      - key: CHROMA_PERSIST_DIRECTORY
+      - key: CHROMA_PATH
         value: /var/data/chroma_store
-databases:
-  - name: ugp-pld-copilot-db
-    databaseName: ugp_pld_copilot
-    user: ugp_pld_copilot
+      - key: DATABASE_PATH
+        value: /var/data/conversations.db

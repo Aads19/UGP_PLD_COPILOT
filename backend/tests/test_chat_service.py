@@ -7,30 +7,20 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.db.models import Conversation, Message
 from backend.app.db.session import Base
-from backend.app.schemas.chat import ChatRequest, CitationResponse, SourceResponse
+from backend.app.schemas.chat import ChatRequest, SourceResponse
 from backend.app.services.chat_service import ChatService
 
 
 class FakePipelineService:
     def run(self, message: str) -> SimpleNamespace:
         return SimpleNamespace(
-            role="assistant",
+            answer=f"Answering: {message}",
             route="database",
-            content_markdown=f"Answering: {message}",
-            citations=[
-                CitationResponse(
-                    doi="10.1000/test",
-                    title="Example paper",
-                    url="https://doi.org/10.1000/test",
-                )
-            ],
             sources=[
                 SourceResponse(
-                    chunk_id="chunk-1",
-                    title="Example paper",
                     doi="10.1000/test",
-                    snippet="Evidence snippet",
-                    score=0.1,
+                    title="Example paper",
+                    chunk_idx=7,
                 )
             ],
         )
@@ -55,4 +45,17 @@ def test_create_reply_persists_messages() -> None:
     assert len(messages) == 2
     assert messages[0].role == "user"
     assert messages[1].role == "assistant"
-    assert response.message.citations[0].doi == "10.1000/test"
+    assert response.sources[0].doi == "10.1000/test"
+    assert response.answer.startswith("Answering:")
+
+
+def test_delete_conversation_removes_messages() -> None:
+    db = build_session()
+    service = ChatService(db=db, pipeline=FakePipelineService())
+    response = service.create_reply(ChatRequest(message="Explain PLD growth conditions."))
+
+    deletion = service.delete_conversation(response.conversation_id)
+
+    assert deletion is not None
+    assert deletion.deleted is True
+    assert db.get(Conversation, response.conversation_id) is None

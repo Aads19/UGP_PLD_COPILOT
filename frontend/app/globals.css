@@ -204,6 +204,13 @@ textarea {
   margin-top: 10px;
 }
 
+.source-card a {
+  color: var(--accent);
+  display: inline-block;
+  margin: 4px 0 6px;
+  text-decoration: underline;
+}
+
 .details {
   margin-top: 16px;
 }
@@ -285,6 +292,7 @@ textarea {
   color: #7d4a26;
   border-radius: 18px;
   padding: 14px 16px;
+  margin-top: 12px;
 }
 
 @media (max-width: 960px) {

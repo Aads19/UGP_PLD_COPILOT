@@ -1,14 +1,27 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef } from "react";
 
 type ChatComposerProps = {
+  value: string;
+  onChange: (message: string) => void;
   onSend: (message: string) => Promise<void> | void;
   disabled?: boolean;
+  focusSignal?: number;
 };
 
-export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
-  const [value, setValue] = useState("");
+export function ChatComposer({
+  value,
+  onChange,
+  onSend,
+  disabled = false,
+  focusSignal = 0
+}: ChatComposerProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [focusSignal]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -16,20 +29,21 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
     if (!message || disabled) {
       return;
     }
-    setValue("");
+    onChange("");
     await onSend(message);
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <textarea
+        ref={textareaRef}
         value={value}
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => onChange(event.target.value)}
         placeholder="Ask a PLD or thin-film literature question..."
         disabled={disabled}
       />
       <div className="composer-actions">
-        <span className="muted">Sources appear beneath each assistant answer when evidence is available.</span>
+        <span className="muted">Ask about growth conditions, evidence, characterization, or thin-film mechanisms.</span>
         <button className="button-primary" type="submit" disabled={disabled}>
           Send
         </button>

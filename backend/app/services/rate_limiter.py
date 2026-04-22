@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 from functools import lru_cache
+from threading import Lock
 
 from backend.app.core.config import get_settings
 
@@ -12,16 +13,18 @@ class RateLimiter:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._requests: dict[str, deque[float]] = defaultdict(deque)
+        self._lock = Lock()
 
     def allow(self, key: str) -> bool:
-        now = time.time()
-        bucket = self._requests[key]
-        while bucket and now - bucket[0] > self.window_seconds:
-            bucket.popleft()
-        if len(bucket) >= self.max_requests:
-            return False
-        bucket.append(now)
-        return True
+        with self._lock:
+            now = time.time()
+            bucket = self._requests[key]
+            while bucket and now - bucket[0] > self.window_seconds:
+                bucket.popleft()
+            if len(bucket) >= self.max_requests:
+                return False
+            bucket.append(now)
+            return True
 
 
 @lru_cache(maxsize=1)
