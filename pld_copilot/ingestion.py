@@ -34,11 +34,12 @@ def ingest_corpus(config: AppConfig, reset: bool = False) -> int:
     if not records:
         raise ValueError("No records found for ingestion.")
 
-    ids = [record["id"] for record in records]
-    documents = [record["text"] for record in records]
-    metadatas = [record["metadata"] for record in records]
-
-    collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
+    for start in range(0, len(records), 1000):
+        batch = records[start : start + 1000]
+        ids = [record["id"] for record in batch]
+        documents = [record["text"] for record in batch]
+        metadatas = [record["metadata"] for record in batch]
+        collection.upsert(ids=ids, documents=documents, metadatas=metadatas)
     return len(records)
 
 

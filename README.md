@@ -2,6 +2,11 @@
 
 UGP PLD Copilot is now structured as a deployable research chatbot for pulsed laser deposition literature workflows. The repository keeps the existing `pld_copilot` agentic RAG package, adds a `FastAPI` backend for chat and conversation APIs, and includes a `Next.js` frontend for a public chatbot-style interface.
 
+The project now supports two deployment modes:
+
+- `frontend/` can run as a self-contained Vercel deployment with integrated `/api/chat` and `/api/health` routes backed by Groq plus the bundled CSV corpus.
+- `backend/` can still run as the full FastAPI service when you want the original Python pipeline, Chroma persistence, and Postgres-backed conversation storage.
+
 ## Architecture
 
 - `pld_copilot/`: existing PLD agent pipeline, retrieval, grading, synthesis, critique, and formatting logic
@@ -9,7 +14,7 @@ UGP PLD Copilot is now structured as a deployable research chatbot for pulsed la
 - `frontend/`: Next.js chatbot UI for public/demo access
 - `render.yaml`: starter Render deployment manifest for the backend
 
-The backend wraps the current pipeline instead of replacing it. The frontend calls only the backend APIs and renders answer markdown, DOI-linked citations, and expandable source evidence.
+The backend wraps the current pipeline instead of replacing it. The frontend renders answer markdown, DOI-linked citations, and expandable source evidence. In the Vercel-integrated mode, the same UI talks to colocated Next.js API routes instead of an external backend service.
 
 ## Features
 
@@ -19,6 +24,7 @@ The backend wraps the current pipeline instead of replacing it. The frontend cal
 - Anonymous saved conversations
 - Health endpoint for deployment checks
 - Docker-ready backend deployment for Render or Railway
+- Self-contained Vercel deployment path for a live demo without separate backend hosting
 
 ## Local Development
 
@@ -69,7 +75,9 @@ Copy-Item .\.env.example .\.env.local
 
 Set:
 
-- `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api`
+- `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api` for split frontend/backend development
+- or leave it unset to use the colocated `/api` routes in the Vercel-integrated mode
+- `GROQ_API_KEY` if you want the integrated frontend API routes to generate live answers locally
 
 Run the frontend:
 
@@ -114,7 +122,7 @@ Reports API readiness, DB connectivity, Groq config presence, and Chroma retriev
 
 ## Chroma Setup
 
-For v1, use your current Chroma artifacts as the source of truth instead of rebuilding embeddings during deploy.
+For the full Python backend, use your current Chroma artifacts as the source of truth instead of rebuilding embeddings during deploy.
 
 Recommended layout:
 
@@ -122,19 +130,21 @@ Recommended layout:
 - set `CHROMA_PERSIST_DIRECTORY` to that folder
 - set `CHROMA_COLLECTION_NAME` to the existing collection name in your Chroma database
 
-Do not start with automatic re-ingestion on boot. Keep ingestion as a manual maintenance workflow.
-
 The repository intentionally does not commit the Chroma binary store because the SQLite bundle exceeds normal GitHub file-size limits. Mount it on the deployment host and point `CHROMA_PERSIST_DIRECTORY` at that mounted folder.
+
+If you deploy only the Vercel-integrated frontend, the app uses the bundled CSV corpus for lightweight retrieval and does not require Chroma to be mounted.
 
 ## Deployment
 
 ### Frontend on Vercel
 
-Deploy the `frontend/` app from GitHub.
+Deploy the `frontend/` app from GitHub or with the Vercel CLI. The frontend can run online by itself without the FastAPI backend.
 
 Environment variable:
 
-- `NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain/api`
+- `GROQ_API_KEY`
+- optionally `GROQ_MODEL`
+- optionally `NEXT_PUBLIC_API_BASE_URL=https://your-backend-domain/api` if you want the deployed UI to talk to the separate FastAPI backend instead of the built-in `/api` routes
 
 ### Backend on Render or Railway
 

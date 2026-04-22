@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r /app/backend-requirements.txt
 
 COPY pld_copilot /app/pld_copilot
 COPY backend /app/backend
+COPY ["PLD CATEGORY FINAL DATASET.csv", "/app/PLD CATEGORY FINAL DATASET.csv"]
 
 EXPOSE 8000
 

@@ -6,7 +6,8 @@ import ReactMarkdown from "react-markdown";
 import { ChatComposer } from "../components/chat-composer";
 import { ConversationSidebar } from "../components/conversation-sidebar";
 import { MessageBubble } from "../components/message-bubble";
-import { chat, fetchConversation, fetchConversations } from "../lib/api";
+import { chat } from "../lib/api";
+import { getStoredConversation, listStoredConversations, saveStoredConversation } from "../lib/storage";
 import { ChatMessage, ConversationSummary } from "../lib/types";
 
 const EXAMPLES = [
@@ -23,22 +24,14 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refreshConversations();
+    setConversations(listStoredConversations());
   }, []);
-
-  async function refreshConversations() {
-    try {
-      const items = await fetchConversations();
-      setConversations(items);
-    } catch {
-      setConversations([]);
-    }
-  }
 
   async function handleSend(message: string) {
     setLoading(true);
     setError(null);
 
+    const activeConversationId = conversationId ?? crypto.randomUUID();
     const optimisticUserMessage: ChatMessage = {
       id: `local-user-${Date.now()}`,
       role: "user",
@@ -48,16 +41,23 @@ export default function HomePage() {
       sources: [],
       created_at: new Date().toISOString()
     };
-    setMessages((current) => [...current, optimisticUserMessage]);
+    const nextMessages = [...messages, optimisticUserMessage];
+    setConversationId(activeConversationId);
+    setMessages(nextMessages);
+    saveStoredConversation(activeConversationId, nextMessages);
+    setConversations(listStoredConversations());
 
     try {
       const response = await chat({
-        conversation_id: conversationId,
+        conversation_id: activeConversationId,
         message
       });
-      setConversationId(response.conversation_id);
-      setMessages((current) => [...current, response.message]);
-      await refreshConversations();
+      const resolvedConversationId = response.conversation_id || activeConversationId;
+      const finalMessages = [...nextMessages, response.message];
+      setConversationId(resolvedConversationId);
+      setMessages(finalMessages);
+      saveStoredConversation(resolvedConversationId, finalMessages);
+      setConversations(listStoredConversations());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to reach the backend right now.");
     } finally {
@@ -69,7 +69,10 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     try {
-      const conversation = await fetchConversation(id);
+      const conversation = getStoredConversation(id);
+      if (!conversation) {
+        throw new Error("Unable to load that conversation.");
+      }
       setConversationId(conversation.id);
       setMessages(conversation.messages);
     } catch (err) {

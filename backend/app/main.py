@@ -7,6 +7,7 @@ from backend.app.api.routes import chat, conversations, health
 from backend.app.core.config import get_settings
 from backend.app.db import models  # noqa: F401
 from backend.app.db.session import Base, engine
+from backend.app.services.bootstrap import bootstrap_chroma_if_needed
 
 
 def create_app() -> FastAPI:
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def on_startup() -> None:
         Base.metadata.create_all(bind=engine)
+        bootstrap_chroma_if_needed(settings.pipeline_config)
 
     return app
 

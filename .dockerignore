@@ -9,6 +9,7 @@ frontend/.next
 chroma_store
 New folder
 *.csv
+!PLD CATEGORY FINAL DATASET.csv
 *.pptx
 *.ipynb
 *.sqlite3

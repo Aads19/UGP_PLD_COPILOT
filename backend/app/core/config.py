@@ -64,6 +64,19 @@ class Settings:
     pipeline_config: AppConfig
 
 
+def _default_corpus_paths() -> list[str]:
+    explicit = os.getenv("CHROMA_BOOTSTRAP_CSV_PATH")
+    if explicit:
+        return [explicit]
+
+    repo_root = Path(__file__).resolve().parents[3]
+    bundled_dataset = repo_root / "PLD CATEGORY FINAL DATASET.csv"
+    if bundled_dataset.exists():
+        return [str(bundled_dataset)]
+
+    return []
+
+
 def _build_pipeline_config() -> AppConfig:
     return AppConfig(
         chroma=ChromaConfig(
@@ -71,11 +84,11 @@ def _build_pipeline_config() -> AppConfig:
             collection_name=os.getenv("CHROMA_COLLECTION_NAME", "pvd_docs"),
         ),
         corpus=CorpusConfig(
-            csv_paths=[],
-            text_column_priority=["text_chunk", "paragraph", "sentence"],
+            csv_paths=_default_corpus_paths(),
+            text_column_priority=["text_chunk", "paragraph", "sentence", "text"],
             metadata_defaults={
                 "domain": "materials_science",
-                "source_type": "chroma_bundle",
+                "source_type": "local_csv",
             },
         ),
         retrieval=RetrievalConfig(
