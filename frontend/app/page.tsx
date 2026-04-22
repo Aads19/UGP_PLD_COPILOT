@@ -84,20 +84,8 @@ export default function HomePage() {
 
   return (
     <main>
-      <section className="hero">
-        <div className="shell hero-panel">
-          <div className="hero-kicker">Public Research Copilot</div>
-          <h1>UGP PLD Copilot</h1>
-          <p>
-            A chatbot-first interface for pulsed laser deposition literature exploration. It is designed
-            to answer from your indexed corpus, surface DOI-linked citations, and make the retrieval
-            evidence visible enough for research discussion and demos.
-          </p>
-          <div className="hero-actions">
-            <a className="button-primary" href="#chat">Open Chat</a>
-            <span className="status-chip">Scientific assistance only. Verify experimental decisions independently.</span>
-          </div>
-        </div>
+      <section className="shell page-header">
+        <h1 className="page-title">UGP PLD Copilot</h1>
       </section>
 
       <section className="shell app-grid" id="chat">
